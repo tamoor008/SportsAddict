@@ -1,0 +1,765 @@
+import { signUp } from '@/utils/auth';
+import { database } from '@/config/firebase';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { ref, set } from 'firebase/database';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+export default function SignUpScreen() {
+  const navigation = useNavigation<any>();
+  const [currentSection, setCurrentSection] = useState<'section1' | 'section2'>('section1');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  // Animation values for section1
+  const section1Opacity = useRef(new Animated.Value(1)).current;
+  const section1TranslateX = useRef(new Animated.Value(0)).current;
+  
+  // Animation values for section2
+  const section2Opacity = useRef(new Animated.Value(0)).current;
+  const section2TranslateX = useRef(new Animated.Value(50)).current;
+
+  // Handle sign up
+  const handleSignUp = async () => {
+    // Validation
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Please enter your full name');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter a password');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    if (!termsAccepted || !privacyAccepted) {
+      Alert.alert('Error', 'Please accept the Terms and Conditions and Privacy Policy');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { user, error } = await signUp(email.trim(), password);
+      if (error) {
+        Alert.alert('Sign Up Error', error);
+        setLoading(false);
+      } else if (user) {
+        // Save user type as "Simple" by default
+        const userTypeRef = ref(database, `users/${user.uid}/userType`);
+        await set(userTypeRef, 'Simple');
+        
+        // Successfully created account and signed in
+        // Firebase Auth automatically signs in the user after signup
+        // Use setTimeout to ensure navigation happens after state updates
+        setTimeout(() => {
+          // Navigate to terms-conditions screen first
+          navigation.navigate('(auth)', { screen: 'terms-conditions' });
+        }, 100);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred during sign up');
+      setLoading(false);
+    }
+  };
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height + 10);
+    });
+    const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height + 10);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Handle section change with animation
+  const changeSection = (section: 'section1' | 'section2') => {
+    if (section === 'section2') {
+      // Transition to section2
+      setCurrentSection('section2');
+      Animated.parallel([
+        // Section1: fade out and slide left
+        Animated.parallel([
+          Animated.timing(section1Opacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(section1TranslateX, {
+            toValue: -50,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Section2: fade in and slide from right
+        Animated.parallel([
+          Animated.timing(section2Opacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(section2TranslateX, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      // Transition to section1
+      setCurrentSection('section1');
+      Animated.parallel([
+        // Section2: fade out and slide right
+        Animated.parallel([
+          Animated.timing(section2Opacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(section2TranslateX, {
+            toValue: 50,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Section1: fade in and slide from left
+        Animated.parallel([
+          Animated.timing(section1Opacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(section1TranslateX, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+  };
+
+  const renderSection1 = () => (
+    <>
+      {/* Top Section */}
+      <View style={styles.topSection}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logoCircle}>
+            <Image
+              source={require('@/assets/images/Logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+      </View>
+      <View style={styles.upperCardSection} />
+      {/* White Card Section */}
+      <View style={styles.whiteCard}>
+        <View style={styles.whiteCardContent}>
+          {/* Handle Indicator */}
+          <View style={styles.handle} />
+          
+          {/* Title */}
+          <Text style={styles.title}>Sign Up</Text>
+
+          {/* Sign Up Options */}
+          <View style={styles.optionsContainer}>
+            {/* Email Option */}
+            <Pressable 
+              style={styles.optionButton}
+              onPress={() => changeSection('section2')}>
+              <View style={[styles.iconCircle, styles.emailIcon]}>
+                <Image
+                  source={require('@/assets/images/email.png')}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.optionText}>Email</Text>
+            </Pressable>
+
+            {/* Google ID Option */}
+            <Pressable style={styles.optionButton}>
+              <View style={[styles.iconCircle, styles.googleIcon]}>
+                <Image
+                  source={require('@/assets/images/google.png')}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.optionText}>Google ID</Text>
+            </Pressable>
+
+            {/* Apple ID Option */}
+            <Pressable style={styles.optionButton}>
+              <View style={[styles.iconCircle, styles.appleIcon]}>
+                <Image
+                  source={require('@/assets/images/apple.png')}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.optionText}>Apple ID</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <Pressable onPress={() => navigation.navigate('(auth)', { screen: 'index' })}>
+            <Text style={styles.signInLink}>Sign In</Text>
+          </Pressable>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderSection2 = () => (
+    <View style={styles.section2Container}>
+      <SafeAreaView style={styles.safeAreaSection2}>
+        {/* Header with Back Button and Title */}
+        <View style={styles.section2Header}>
+          <Pressable 
+            style={styles.backButton}
+            onPress={() => changeSection('section1')}>
+            <Ionicons name="arrow-back" size={24} color="#06ABEB" />
+          </Pressable>
+          <Text style={styles.emailTitle}>Sign Up with Email</Text>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
+
+        {/* Content Container */}
+        <ScrollView 
+          style={styles.section2MainContent}
+          contentContainerStyle={[
+            styles.scrollViewContent,
+            { paddingBottom: keyboardHeight }
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          {/* Form Container */}
+          <View style={styles.formContainer}>
+            {/* Full Name Input */}
+            <View style={styles.inputCP}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <View style={styles.inputWrapper}>
+                <Image
+                  source={require('@/assets/images/user.png')}
+                  style={styles.inputIcon}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Full name"
+                  placeholderTextColor="#999999"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+
+            {/* Email Input */}
+            <View style={styles.inputCP}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <View style={styles.inputWrapper}>
+                <Image
+                  source={require('@/assets/images/email1.png')}
+                  style={styles.inputIcon}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  placeholderTextColor="#999999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputCP}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <View style={styles.inputWrapper}>
+                <Image
+                  source={require('@/assets/images/lock.png')}
+                  style={styles.inputIcon}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#999999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <Pressable 
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}>
+                  <Image
+                    source={showPassword 
+                      ? require('@/assets/images/hides.png')
+                      : require('@/assets/images/view.png')}
+                    style={styles.inputIconv}
+                    resizeMode="contain"
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Confirm Password</Text>
+              <View style={styles.inputWrapper}>
+                <Image
+                  source={require('@/assets/images/lock.png')}
+                  style={styles.inputIcon}
+                  resizeMode="contain"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm Password"
+                  placeholderTextColor="#999999"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <Pressable 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeIcon}>
+                  <Image
+                    source={showConfirmPassword 
+                      ? require('@/assets/images/hides.png')
+                      : require('@/assets/images/view.png')}
+                    style={styles.inputIconv}
+                    resizeMode="contain"
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Terms and Conditions Checkbox */}
+            <View style={styles.checkboxContainer}>
+              <Pressable 
+                style={styles.checkboxRow}
+                onPress={() => setTermsAccepted(!termsAccepted)}>
+                <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                  {termsAccepted && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxText}>
+                  By sign up I agree with{' '}
+                  <Text style={styles.linkText}>Terms and Conditions</Text>
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Privacy Policy Checkbox */}
+            <View style={styles.checkboxContainer}>
+              <Pressable 
+                style={styles.checkboxRow}
+                onPress={() => setPrivacyAccepted(!privacyAccepted)}>
+                <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
+                  {privacyAccepted && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxText}>
+                  By sign up I agree with{' '}
+                  <Text style={styles.linkText}>Privacy and Policy</Text>
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Create Account Button */}
+            <Pressable 
+              style={[styles.createAccountButton, loading && styles.createAccountButtonDisabled]}
+              onPress={handleSignUp}
+              disabled={loading}>
+              <Text style={styles.createAccountButtonText}>
+                {loading ? 'Creating account...' : 'Create account now'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footerSection2}>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <Pressable onPress={() => navigation.navigate('(auth)', { screen: 'index' })}>
+              <Text style={styles.signInLink}>Sign In</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+
+  return (
+    <View style={styles.rootContainer}>
+      {/* StatusBar - Controlled by currentSection */}
+      <StatusBar style={currentSection === 'section1' ? 'light' : 'dark'} />
+      
+      {/* Section 1 - Animated */}
+      <Animated.View
+        style={[
+          styles.animatedSection,
+          {
+            opacity: section1Opacity,
+            transform: [{ translateX: section1TranslateX }],
+            zIndex: currentSection === 'section1' ? 2 : 1,
+          },
+          currentSection === 'section1' && styles.animatedSectionActive,
+        ]}
+        pointerEvents={currentSection === 'section1' ? 'auto' : 'none'}>
+        <LinearGradient
+          colors={['#7D74DE', '#D8FFFF']}
+          style={styles.container}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}>
+          <SafeAreaView style={styles.safeArea} edges={['top']}>
+            {renderSection1()}
+          </SafeAreaView>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Section 2 - Animated */}
+      <Animated.View
+        style={[
+          styles.animatedSection,
+          {
+            opacity: section2Opacity,
+            transform: [{ translateX: section2TranslateX }],
+            zIndex: currentSection === 'section2' ? 2 : 1,
+          },
+          currentSection === 'section2' && styles.animatedSectionActive,
+        ]}
+        pointerEvents={currentSection === 'section2' ? 'auto' : 'none'}>
+        {renderSection2()}
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  animatedSection: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  animatedSectionActive: {
+    // Additional styles for active section if needed
+  },
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  topSection: {
+    flex: 0.35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  upperCardSection: {
+    height: 20,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    top: 7,
+    opacity: 0.5,
+  },
+  logoContainer: {
+  },
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 110,
+    height: 110,
+  },
+  whiteCard: {
+    flex: 0.95,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    justifyContent: 'space-between',
+    shadowColor: '#7D74DE',
+    shadowOffset: { width: 0, height: -9 },
+    shadowOpacity: 30,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  whiteCardContent: {
+    paddingTop: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#CCCCCC',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  optionsContainer: {
+    gap: 16,
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 21,
+    paddingHorizontal: 20,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  emailIcon: {
+    backgroundColor: '#06ABEB',
+  },
+  googleIcon: {
+    backgroundColor: '#DB4437',
+  },
+  appleIcon: {
+    backgroundColor: '#000000',
+  },
+  iconImage: {
+    width: 24,
+    height: 24,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  footer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  signInLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#06ABEB',
+  },
+  // Section 2 Styles
+  section2Container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  safeAreaSection2: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  section2Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    marginBottom: 62,
+  },
+  backButton: {
+    padding: 4,
+    width: 32,
+  },
+  backButtonPlaceholder: {
+    width: 32,
+  },
+  emailTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    flex: 1,
+  },
+  section2MainContent: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+  },
+  formContainer: {
+    paddingHorizontal: 20,
+  },
+  footerSection2: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 30,
+  },
+  inputContainer: {
+    paddingBottom: 12,
+  },
+  inputCP: {
+    paddingBottom:28,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F4F5F6',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 17,
+    borderColor: '#E0E0E0',
+  },
+  inputIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+    tintColor: '#323232',
+  },
+  inputIconv: {
+    width: 20,
+    height: 20,
+    tintColor: '#323232',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#000000',
+  },
+  eyeIcon: {
+    
+  },
+  checkboxContainer: {
+    marginBottom: 16,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#75818F',
+    marginRight: 8,
+    marginTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxChecked: {
+    backgroundColor: '#06ABEB',
+    borderColor: '#06ABEB',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  checkboxText: {
+    fontSize: 14,
+    color: '#666666',
+    flex: 1,
+    lineHeight: 20,
+  },
+  linkText: {
+    color: '#06ABEB',
+    fontWeight: '600',
+  },
+  createAccountButton: {
+    backgroundColor: '#06ABEB',
+    borderRadius: 120,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop:10,
+  },
+  createAccountButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  createAccountButtonDisabled: {
+    opacity: 0.6,
+  },
+});
+
