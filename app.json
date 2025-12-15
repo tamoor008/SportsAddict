@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tamoor088.SportsAddict"
+      "bundleIdentifier": "com.sportsaddict.app",
+      "splash": false
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.tamoor088.SportsAddict"
+      "package": "com.sportsaddict.app"
     },
     "web": {
       "output": "static",
